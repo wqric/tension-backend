@@ -2,6 +2,7 @@ package main
 
 import (
 	"fitness-backend/internal" // Замени на свой путь к пакету
+	"fmt"
 	"log"
 
 	"github.com/gin-gonic/gin"
@@ -22,6 +23,7 @@ func main() {
 		}
 		c.Next()
 	})
+	fmt.Println("VERSION 2.0")
 
 	r.POST("/register", internal.NewUser)
 	r.POST("/login", internal.Login)
