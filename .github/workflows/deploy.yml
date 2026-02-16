@@ -28,7 +28,4 @@ jobs:
 
       - name: Check Status
         run: systemctl status fitness.service
-      - name: Sync Source Code
-        run: |
-          # Копируем все файлы из папки ранера в твою папку проекта
-          rsync -avz --exclude='.git' . /root/tension/
+      
