@@ -11,7 +11,7 @@ func main() {
 
 	internal.InitDatabase()
 	r := gin.Default()
-
+	// привет 1
 	r.Use(func(c *gin.Context) {
 		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, PUT, DELETE, OPTIONS")
