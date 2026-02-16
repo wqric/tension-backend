@@ -54,7 +54,6 @@ func AutoAssignWorkouts(userID int) ([]UserWorkoutResponse, error) {
 
 		// --- ЛОГИКА УМНОГО УДАЛЕНИЯ ---
 		// Удаляем только те UserWorkout, чьи параметры в таблице Workout
-		// НЕ совпадают с новыми параметрами пользователя (Aim или Difficult)
 		err := tx.Where("user_id = ? AND is_done = ? AND workout_id IN (?)",
 			userID,
 			false,
