@@ -2,7 +2,7 @@ name: Full Auto Deploy
 
 on:
   push:
-    branches: [ master ] # Если твоя ветка называется master, оставляем так
+    branches: [ master ]
 
 jobs:
   build-and-deploy:
@@ -14,26 +14,23 @@ jobs:
 
       - name: Build Go App
         run: |
-          # Собираем бинарник. Флаг -v покажет прогресс, -o задает имя файла.
-          # Если main.go в папке cmd, используй ./cmd. Если в корне — используй .
+          # Собираем бинарник. Убедись, что путь ./cmd верный.
           go build -v -o myapp ./cmd 
 
       - name: Prepare and Copy Binary
         run: |
-          # 1. Сначала останавливаем сервис, чтобы освободить файл (решает Text file busy)
-          sudo systemctl stop tension.service
+          # 1. Останавливаем сервис fitness
+          sudo systemctl stop fitness.service
           
-          # 2. Удаляем старый файл и копируем новый
+          # 2. Удаляем старый и копируем новый файл
           rm -f /root/tension/myapp
           cp myapp /root/tension/myapp
           
-          # 3. Устанавливаем права на выполнение
+          # 3. Права на запуск
           chmod +x /root/tension/myapp
 
       - name: Start Service
-        # Запускаем сервис после того, как файл был успешно заменен
         run: sudo systemctl start fitness.service
 
       - name: Check Status
-        # Финальная проверка, что сервис поднялся и работает
         run: systemctl status fitness.service
