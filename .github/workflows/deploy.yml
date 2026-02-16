@@ -14,25 +14,14 @@ jobs:
 
       - name: Build Go App
         run: |
-          # Собираем бинарник. Убедись, что путь ./cmd верный.
-          go build -v -o myapp ./cmd 
+          go build -v -o myapp ./cmd
 
       - name: Prepare and Copy Binary
         run: |
-          # 1. Останавливаем сервис fitness
           sudo systemctl stop fitness.service
-          
-          # 2. Удаляем старый и копируем новый файл
           rm -f /root/tension/myapp
           cp myapp /root/tension/myapp
-          
-          # 3. Права на запуск
           chmod +x /root/tension/myapp
-
-        - name: Sync Source Code
-        run: |
-          # Копируем все файлы из папки ранера в твою папку проекта
-          rsync -avz --exclude='.git' . /root/tension/
 
       - name: Start Service
         run: sudo systemctl start fitness.service
