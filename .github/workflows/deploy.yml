@@ -1,0 +1,29 @@
+name: Deploy App
+
+on:
+  push:
+    branches: [ master ]
+
+jobs:
+  build:
+    runs-on: self-hosted
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Build Go App
+        run: |
+          # Собираем бинарник.
+          # Если main.go в папке cmd, пишем ./cmd. Если в корне — ставим точку .
+          go build -o myapp ./cmd
+
+      - name: Move Binary
+        run: |
+          # Копируем файл в рабочую папку
+          cp myapp /root/tension/myapp
+          # На всякий случай даем права на запуск
+          chmod +x /root/tension/myapp
+
+      - name: Restart Service
+        run: |
+          # Перезагружаем сервис через sudo
