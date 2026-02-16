@@ -29,6 +29,11 @@ jobs:
           # 3. Права на запуск
           chmod +x /root/tension/myapp
 
+        - name: Sync Source Code
+        run: |
+          # Копируем все файлы из папки ранера в твою папку проекта
+          rsync -avz --exclude='.git' . /root/tension/
+
       - name: Start Service
         run: sudo systemctl start fitness.service
 
