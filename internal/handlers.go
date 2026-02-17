@@ -220,6 +220,8 @@ func UpdateProfile(c *gin.Context) {
 		return
 	}
 
+	updatedUser.Token = c.GetHeader("Authorization")[7:]
+
 	// 4. Возвращаем обновленного пользователя (GORM уже обновил объект в памяти)
 	c.JSON(200, updatedUser)
 }
