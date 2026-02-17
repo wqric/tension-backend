@@ -221,8 +221,5 @@ func UpdateProfile(c *gin.Context) {
 	}
 
 	// 4. Возвращаем обновленного пользователя (GORM уже обновил объект в памяти)
-	c.JSON(200, gin.H{
-		"status": "success",
-		"user":   updatedUser,
-	})
+	c.JSON(200, updatedUser)
 }
