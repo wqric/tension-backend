@@ -200,7 +200,6 @@ func MarkWorkoutDone(c *gin.Context) {
 }
 
 func UpdateProfile(c *gin.Context) {
-	// 1. Извлекаем ID из JWT (убедись, что в Middleware ты положил его именно как "userID")
 	userID, exists := c.Get("userID")
 	if !exists {
 		c.JSON(401, gin.H{"error": "Unauthorized"})
@@ -215,7 +214,6 @@ func UpdateProfile(c *gin.Context) {
 		return
 	}
 
-	// 3. Вызываем твою готовую функцию
 	updatedUser, err := UpdateUser(userID.(int), data)
 	if err != nil {
 		c.JSON(500, gin.H{"error": "Failed to update user", "details": err.Error()})

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 func GetUserProfile(id int) *User {
@@ -163,14 +164,18 @@ func CompleteWorkout(userID int, workoutID int, date string) error {
 func UpdateUser(id int, data map[string]interface{}) (*User, error) {
 	var user User
 
-	if err := db.First(&user, id).Error; err != nil {
-		return nil, err
-	}
-
-	result := db.Model(&user).Updates(data)
+	// Используем Clauses для получения обновленных данных сразу после Update
+	result := db.Model(&user).
+		Clauses(clause.Returning{}).
+		Where("id = ?", id).
+		Updates(data)
 
 	if result.Error != nil {
 		return nil, result.Error
+	}
+
+	if result.RowsAffected == 0 {
+		return nil, gorm.ErrRecordNotFound
 	}
 
 	return &user, nil
