@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 )
 
 func GetUserProfile(id int) *User {
@@ -164,20 +163,19 @@ func CompleteWorkout(userID int, workoutID int, date string) error {
 func UpdateUser(id int, data map[string]interface{}) (*User, error) {
 	var user User
 
-	// Используем Clauses для получения обновленных данных сразу после Update
-	result := db.Model(&user).
-		Clauses(clause.Returning{}).
-		Where("id = ?", id).
-		Updates(data)
-
-	if result.Error != nil {
-		return nil, result.Error
+	// 1. Сначала находим пользователя со всеми текущими данными
+	if err := db.First(&user, id).Error; err != nil {
+		return nil, err
 	}
 
-	if result.RowsAffected == 0 {
-		return nil, gorm.ErrRecordNotFound
+	// 2. Обновляем найденную запись переданными полями
+	// Updates при работе со структурой (user) автоматически заполнит её новыми данными
+	if err := db.Model(&user).Updates(data).Error; err != nil {
+		return nil, err
 	}
 
+	// Теперь объект 'user' содержит и старые поля, которые мы не трогали,
+	// и новые поля, которые пришли в 'data'
 	return &user, nil
 }
 
