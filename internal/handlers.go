@@ -106,42 +106,40 @@ func GetProfile(c *gin.Context) {
 }
 
 func SetupWorkoutPlan(c *gin.Context) {
+	// 1. Проверка авторизации
 	userID, exists := c.Get("userID")
 	if !exists {
 		c.JSON(401, gin.H{"error": "Unauthorized"})
 		return
 	}
 
+	// 2. Входящие параметры
 	var req struct {
 		Months int `json:"months" binding:"required,min=1"`
 		Freq   int `json:"freq" binding:"required,min=1,max=7"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(400, gin.H{"error": "Invalid input. Provide months (1-12) and frequency (1-7)"})
+		c.JSON(400, gin.H{"error": "Invalid input. Provide months and freq"})
 		return
 	}
 
+	// 3. Генерация плана
+	// Важно: AutoAssignWorkouts должна возвращать []UserWorkoutResponse
 	schedule, err := AutoAssignWorkouts(userID.(int), req.Months, req.Freq)
 	if err != nil {
-		c.JSON(500, gin.H{
-			"error": "Failed to generate workout plan",
-		})
+		c.JSON(500, gin.H{"error": "Failed to generate workout plan"})
 		return
 	}
 
-	// 4. Если тренировок не нашлось
+	// 4. Проверка на пустоту
 	if len(schedule) == 0 {
-		c.JSON(404, gin.H{"error": "No suitable workouts found for your parameters"})
+		c.JSON(404, gin.H{"error": "No suitable workouts found"})
 		return
 	}
 
-	// 5. Успешный ответ
-	c.JSON(200, gin.H{
-		"status":   "plan_generated",
-		"message":  "Workout plan created successfully",
-		"count":    len(schedule),
-		"workouts": schedule,
-	})
+	// 5. Возвращаем ТОЛЬКО список (массив объектов)
+	// Теперь формат ответа идентичен GetWorkouts
+	c.JSON(200, schedule)
 }
 
 func GetWorkouts(c *gin.Context) {

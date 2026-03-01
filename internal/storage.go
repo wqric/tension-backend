@@ -2,7 +2,8 @@ package internal
 
 import (
 	"errors"
-	"fmt"
+	"math/rand"
+
 	"log"
 	"math"
 	"time"
@@ -39,31 +40,40 @@ func AutoAssignWorkouts(userID int, months int, freq int) ([]UserWorkoutResponse
 		return nil, err
 	}
 
+	// 1. Загружаем подходящие тренировки
 	err := db.Preload("Exercises").
 		Where("aim = ? AND difficult = ?", user.Aim, user.Difficult).
 		Find(&suitableWorkouts).Error
 
 	if err != nil || len(suitableWorkouts) == 0 {
-		fmt.Println(err, len(suitableWorkouts))
 		return nil, errors.New("no workouts found for new parameters")
 	}
+
+	// --- ДОБАВЛЯЕМ ПЕРЕМЕШИВАНИЕ ---
+	// Инициализируем генератор случайных чисел
+	rand.Seed(time.Now().UnixNano())
+	// Перемешиваем исходный список тренировок, чтобы порядок всегда был разным
+	rand.Shuffle(len(suitableWorkouts), func(i, j int) {
+		suitableWorkouts[i], suitableWorkouts[j] = suitableWorkouts[j], suitableWorkouts[i]
+	})
+	// ------------------------------
 
 	totalWorkoutsToGen := freq * 4 * months
 	daysStep := 7.0 / float64(freq)
 
 	err = db.Transaction(func(tx *gorm.DB) error {
-
+		// Удаляем только будущие невыполненные
 		tx.Where("user_id = ? AND is_done = ? AND scheduled_date > ?",
 			userID, false, time.Now()).Delete(&UserWorkout{})
 
-		// Начинаем планировать с завтрашнего дня
 		startDate := time.Now().AddDate(0, 0, 1).Truncate(24 * time.Hour)
 
 		for i := 0; i < totalWorkoutsToGen; i++ {
-			workout := suitableWorkouts[i%len(suitableWorkouts)]
+			// Выбираем случайную тренировку из списка подходящих
+			// Используем rand.Intn, чтобы выбор был непредсказуемым
+			randomIndex := rand.Intn(len(suitableWorkouts))
+			workout := suitableWorkouts[randomIndex]
 
-			// Вычисляем дату для каждой тренировки
-			// i * daysStep дает равномерное распределение (например, каждые 2.3 дня)
 			daysOffset := int(float64(i) * daysStep)
 			scheduledDate := startDate.AddDate(0, 0, daysOffset)
 
@@ -78,15 +88,15 @@ func AutoAssignWorkouts(userID int, months int, freq int) ([]UserWorkoutResponse
 				return err
 			}
 
-			// Добавляем в ответ
 			response = append(response, UserWorkoutResponse{
 				WorkoutID:     workout.ID,
 				Title:         workout.Title,
+				Desc:          workout.Desc, // Не забудь добавить описание
 				ScheduledDate: scheduledDate,
+				IsDone:        false,
 				Exercises:     workout.Exercises,
 			})
 		}
-
 		return nil
 	})
 
