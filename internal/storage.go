@@ -2,6 +2,7 @@ package internal
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"math"
 	"time"
@@ -29,74 +30,61 @@ func CreateUser(email, password string) (*User, error) {
 	return user, nil
 }
 
-func AutoAssignWorkouts(userID int) ([]UserWorkoutResponse, error) {
+func AutoAssignWorkouts(userID int, months int, freq int) ([]UserWorkoutResponse, error) {
 	var user User
 	var suitableWorkouts []Workout
 	response := make([]UserWorkoutResponse, 0)
 
-	// 1. Получаем текущий профиль пользователя
 	if err := db.First(&user, userID).Error; err != nil {
 		return nil, err
 	}
 
-	// 2. Ищем новые подходящие тренировки
 	err := db.Preload("Exercises").
 		Where("aim = ? AND difficult = ?", user.Aim, user.Difficult).
-		Limit(3).
 		Find(&suitableWorkouts).Error
 
 	if err != nil || len(suitableWorkouts) == 0 {
+		fmt.Println(err, len(suitableWorkouts))
 		return nil, errors.New("no workouts found for new parameters")
 	}
 
-	// 3. Транзакция для очистки и перезаписи
+	totalWorkoutsToGen := freq * 4 * months
+	daysStep := 7.0 / float64(freq)
+
 	err = db.Transaction(func(tx *gorm.DB) error {
 
-		// --- ЛОГИКА УМНОГО УДАЛЕНИЯ ---
-		// Удаляем только те UserWorkout, чьи параметры в таблице Workout
-		err := tx.Where("user_id = ? AND is_done = ? AND workout_id IN (?)",
-			userID,
-			false,
-			tx.Table("workouts").
-				Select("id").
-				Where("aim != ? OR difficult != ?", user.Aim, user.Difficult),
-		).Delete(&UserWorkout{}).Error
+		tx.Where("user_id = ? AND is_done = ? AND scheduled_date > ?",
+			userID, false, time.Now()).Delete(&UserWorkout{})
 
-		if err != nil {
-			return err
-		}
-		// ------------------------------
+		// Начинаем планировать с завтрашнего дня
+		startDate := time.Now().AddDate(0, 0, 1).Truncate(24 * time.Hour)
 
-		// Проверяем, нужно ли назначать новые (если после удаления пусто или план не полон)
-		var count int64
-		tx.Model(&UserWorkout{}).Where("user_id = ? AND is_done = ?", userID, false).Count(&count)
+		for i := 0; i < totalWorkoutsToGen; i++ {
+			workout := suitableWorkouts[i%len(suitableWorkouts)]
 
-		if count < 3 {
-			nextDate := time.Now().AddDate(0, 0, 1).Truncate(24 * time.Hour)
+			// Вычисляем дату для каждой тренировки
+			// i * daysStep дает равномерное распределение (например, каждые 2.3 дня)
+			daysOffset := int(float64(i) * daysStep)
+			scheduledDate := startDate.AddDate(0, 0, daysOffset)
 
-			for i := 0; i < int(3-count); i++ {
-				workout := suitableWorkouts[i%len(suitableWorkouts)]
-
-				userWorkout := UserWorkout{
-					UserID:        user.ID,
-					WorkoutID:     workout.ID,
-					ScheduledDate: nextDate,
-					IsDone:        false,
-				}
-
-				if err := tx.Create(&userWorkout).Error; err != nil {
-					return err
-				}
-
-				// Добавляем в ответ (только новые)
-				response = append(response, UserWorkoutResponse{
-					WorkoutID:     workout.ID,
-					Title:         workout.Title,
-					ScheduledDate: nextDate,
-					Exercises:     workout.Exercises,
-				})
-				nextDate = nextDate.AddDate(0, 0, 2)
+			userWorkout := UserWorkout{
+				UserID:        user.ID,
+				WorkoutID:     workout.ID,
+				ScheduledDate: scheduledDate,
+				IsDone:        false,
 			}
+
+			if err := tx.Create(&userWorkout).Error; err != nil {
+				return err
+			}
+
+			// Добавляем в ответ
+			response = append(response, UserWorkoutResponse{
+				WorkoutID:     workout.ID,
+				Title:         workout.Title,
+				ScheduledDate: scheduledDate,
+				Exercises:     workout.Exercises,
+			})
 		}
 
 		return nil
@@ -109,20 +97,16 @@ func GetUserStats(userID int) (UserStatsResponse, error) {
 	var stats UserStatsResponse
 	var totalAssigned int64
 	var totalDone int64
-
-	// 1. Считаем тренировки
 	db.Model(&UserWorkout{}).Where("user_id = ?", userID).Count(&totalAssigned)
 	db.Model(&UserWorkout{}).Where("user_id = ? AND is_done = ?", userID, true).Count(&totalDone)
 
 	stats.TotalWorkouts = int(totalDone)
 
-	// 2. Округляем Rate (33.3333 -> 33.3)
 	if totalAssigned > 0 {
 		rate := (float64(totalDone) / float64(totalAssigned)) * 100
 		stats.CompletionRate = math.Round(rate*10) / 10
 	}
 
-	// 3. Считаем упражнения (Вариант через циклы, если SQL падает)
 	var completedWorkouts []UserWorkout
 	db.Preload("Workout.Exercises").
 		Where("user_id = ? AND is_done = ?", userID, true).
@@ -134,14 +118,10 @@ func GetUserStats(userID int) (UserStatsResponse, error) {
 	}
 	stats.TotalExercises = exCount
 
-	// 4. Любимая тренировка
-	// ... твой код с FavoriteWorkout ...
-
 	return stats, nil
 }
 
 func CompleteWorkout(userID int, workoutID int, date string) error {
-	// Используем DATE(scheduled_date), чтобы сравнивать только календарный день
 	result := db.Model(&UserWorkout{}).
 		Where("user_id = ? AND workout_id = ? AND DATE(scheduled_date) = DATE(?)",
 			userID, workoutID, date).
@@ -152,7 +132,6 @@ func CompleteWorkout(userID int, workoutID int, date string) error {
 	}
 
 	if result.RowsAffected == 0 {
-		// Логируем для отладки, что именно мы искали
 		log.Printf("Запись не найдена: User %d, Workout %d, Date %s", userID, workoutID, date)
 		return errors.New("тренировка не найдена для указанного пользователя и даты")
 	}
@@ -163,19 +142,14 @@ func CompleteWorkout(userID int, workoutID int, date string) error {
 func UpdateUser(id int, data map[string]interface{}) (*User, error) {
 	var user User
 
-	// 1. Сначала находим пользователя со всеми текущими данными
 	if err := db.First(&user, id).Error; err != nil {
 		return nil, err
 	}
 
-	// 2. Обновляем найденную запись переданными полями
-	// Updates при работе со структурой (user) автоматически заполнит её новыми данными
 	if err := db.Model(&user).Updates(data).Error; err != nil {
 		return nil, err
 	}
 
-	// Теперь объект 'user' содержит и старые поля, которые мы не трогали,
-	// и новые поля, которые пришли в 'data'
 	return &user, nil
 }
 

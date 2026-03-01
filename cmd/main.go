@@ -1,7 +1,7 @@
 package main
 
 import (
-	"fitness-backend/internal" // Замени на свой путь к пакету
+	"fitness-backend/internal"
 	"fmt"
 	"log"
 
@@ -12,7 +12,6 @@ func main() {
 
 	internal.InitDatabase()
 	r := gin.Default()
-	// привет 1
 	r.Use(func(c *gin.Context) {
 		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, PUT, DELETE, OPTIONS")

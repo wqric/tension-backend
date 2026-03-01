@@ -6,8 +6,6 @@ import (
 
 func NewUser(c *gin.Context) {
 	var rq RegistrationRQ
-
-	// Привязываем JSON из тела запроса к структуре
 	if err := c.ShouldBindJSON(&rq); err != nil {
 		c.JSON(400, gin.H{
 			"error":   "Invalid request data",
@@ -16,7 +14,6 @@ func NewUser(c *gin.Context) {
 		return
 	}
 
-	// Валидация обязательных полей
 	if rq.Email == "" || rq.Password == "" {
 		c.JSON(400, gin.H{
 			"error": "All fields are required: email, password, name, lastname",
@@ -24,7 +21,6 @@ func NewUser(c *gin.Context) {
 		return
 	}
 
-	// Создаем пользователя
 	user, err := CreateUser(rq.Email, rq.Password)
 	if err != nil {
 		c.JSON(500, gin.H{
@@ -38,7 +34,6 @@ func NewUser(c *gin.Context) {
 		})
 	}
 	user.Token = token
-	// Возвращаем успешный ответ (исключая пароль из ответа)
 	c.JSON(200, user)
 }
 
@@ -111,31 +106,40 @@ func GetProfile(c *gin.Context) {
 }
 
 func SetupWorkoutPlan(c *gin.Context) {
-	// 1. Извлекаем userID, который положил туда AuthMiddleware
 	userID, exists := c.Get("userID")
 	if !exists {
 		c.JSON(401, gin.H{"error": "Unauthorized"})
 		return
 	}
 
-	schedule, err := AutoAssignWorkouts(userID.(int))
+	var req struct {
+		Months int `json:"months" binding:"required,min=1"`
+		Freq   int `json:"freq" binding:"required,min=1,max=7"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"error": "Invalid input. Provide months (1-12) and frequency (1-7)"})
+		return
+	}
+
+	schedule, err := AutoAssignWorkouts(userID.(int), req.Months, req.Freq)
 	if err != nil {
 		c.JSON(500, gin.H{
-			"error":   "Failed to generate workout plan",
-			"details": err.Error(),
+			"error": "Failed to generate workout plan",
 		})
 		return
 	}
 
-	// 3. Если тренировок не нашлось под такие параметры
+	// 4. Если тренировок не нашлось
 	if len(schedule) == 0 {
-		c.JSON(404, gin.H{"error": "No suitable workouts found for your level/aim"})
+		c.JSON(404, gin.H{"error": "No suitable workouts found for your parameters"})
 		return
 	}
 
-	// 4. Возвращаем успешный ответ со списком
+	// 5. Успешный ответ
 	c.JSON(200, gin.H{
-		"status":   "plan_created",
+		"status":   "plan_generated",
+		"message":  "Workout plan created successfully",
+		"count":    len(schedule),
 		"workouts": schedule,
 	})
 }
@@ -145,7 +149,6 @@ func GetWorkouts(c *gin.Context) {
 	var userWorkouts []UserWorkout
 	var response []UserWorkoutResponse
 
-	// 1. Загружаем связи + тренировки + упражнения через двойной Preload
 	err := db.Where("user_id = ?", userID).
 		Preload("Workout").
 		Preload("Workout.Exercises").
@@ -173,11 +176,9 @@ func GetWorkouts(c *gin.Context) {
 
 func MarkWorkoutDone(c *gin.Context) {
 	userID, _ := c.Get("userID")
-
-	// Ожидаем JSON с ID тренировки и датой, на которую она была назначена
 	var rq struct {
 		WorkoutID int    `json:"workout_id"`
-		Date      string `json:"date"` // Формат "2026-02-07"
+		Date      string `json:"date"`
 	}
 
 	if err := c.ShouldBindJSON(&rq); err != nil {
@@ -185,7 +186,6 @@ func MarkWorkoutDone(c *gin.Context) {
 		return
 	}
 
-	// Вызываем функцию обновления в базе
 	err := CompleteWorkout(userID.(int), rq.WorkoutID, rq.Date)
 	if err != nil {
 		c.JSON(500, gin.H{"error": "failed to update status", "details": err.Error()})

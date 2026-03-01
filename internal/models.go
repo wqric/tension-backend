@@ -17,9 +17,8 @@ type User struct {
 }
 
 type UserWorkout struct {
-	UserID    int `gorm:"primaryKey"`
-	WorkoutID int `gorm:"primaryKey"`
-	// Добавь эту строку ниже:
+	UserID        int       `gorm:"primaryKey"`
+	WorkoutID     int       `gorm:"primaryKey"`
 	Workout       Workout   `gorm:"foreignKey:WorkoutID"`
 	ScheduledDate time.Time `gorm:"primaryKey"`
 	IsDone        bool      `gorm:"default:false"`
