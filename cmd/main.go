@@ -10,14 +10,11 @@ import (
 
 func main() {
 
-	func main() {
     err := internal.InitDatabase()
     if err != nil {
 		fmt.Println("DB did not init")
         panic(err)
     }
-
-    r := gin.Default()
 
 	r := gin.Default()
 	r.Use(func(c *gin.Context) {
