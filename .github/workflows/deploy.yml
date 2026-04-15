@@ -1,5 +1,4 @@
 name: Full Auto Deploy
-
 on:
   push:
     branches: [ master ]
@@ -7,25 +6,26 @@ on:
 jobs:
   build-and-deploy:
     runs-on: self-hosted
-    
+
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
       - name: Build Go App
-        run: |
-          go build -v -o myapp ./cmd
+        run: go build -v -o myapp_new ./cmd
 
-      - name: Prepare and Copy Binary
+      - name: Deploy Binary
         run: |
-          sudo systemctl stop fitness.service
-          rm -f /root/tension/myapp
-          cp myapp /root/tension/myapp
+          sudo systemctl stop fitness.service || true
+          mv myapp_new /root/tension/myapp
           chmod +x /root/tension/myapp
 
       - name: Start Service
         run: sudo systemctl start fitness.service
 
-      - name: Check Status
-        run: systemctl status fitness.service
-      
+      - name: Verify Service
+        run: |
+          sleep 2
+          systemctl is-active --quiet fitness.service \
+            && echo "✅ Service is running" \
+            || (journalctl -u fitness.service -n 20 && exit 1)
