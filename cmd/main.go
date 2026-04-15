@@ -10,7 +10,15 @@ import (
 
 func main() {
 
-	internal.InitDatabase()
+	func main() {
+    err := internal.InitDatabase()
+    if err != nil {
+		fmt.Println("DB did not init")
+        panic(err)
+    }
+
+    r := gin.Default()
+
 	r := gin.Default()
 	r.Use(func(c *gin.Context) {
 		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
